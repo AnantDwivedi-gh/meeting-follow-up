@@ -3,23 +3,19 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Plus, Loader2, Sparkles } from "lucide-react";
-import { Id } from "../../convex/_generated/dataModel";
+import { Loader2, Sparkles, ClipboardPaste } from "lucide-react";
+import { useAgent } from "@/lib/useAgent";
 
-export default function MeetingForm({
-  onCreated,
-}: {
-  onCreated?: (id: Id<"meetings">) => void;
-}) {
+export default function MeetingForm({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [participants, setParticipants] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [stage, setStage] = useState("");
 
   const createMeeting = useMutation(api.meetings.create);
-  const createFollowUp = useMutation(api.followUps.create);
+  const { processMeeting } = useAgent();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,131 +23,164 @@ export default function MeetingForm({
     setLoading(true);
 
     try {
+      setStage("Creating meeting...");
+      const participantList = participants
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
       const meetingId = await createMeeting({
         title,
         date,
-        participants: participants
-          .split(",")
-          .map((p) => p.trim())
-          .filter(Boolean),
+        participants: participantList,
+        notes,
+        source: "manual",
+      });
+
+      setStage("Agent is analyzing notes...");
+      await processMeeting({
+        _id: meetingId,
+        title,
+        date,
+        participants: participantList,
         notes,
       });
 
-      // Auto-extract follow-ups with AI
-      setAiLoading(true);
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: "user",
-                content: `Extract action items from these meeting notes. Return ONLY valid JSON, no other text:\n\nMeeting: ${title}\nDate: ${date}\nParticipants: ${participants}\nNotes:\n${notes}`,
-              },
-            ],
-          }),
-        });
-
-        const data = await res.json();
-        const jsonMatch = data.reply.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (parsed.followUps) {
-            for (const fu of parsed.followUps) {
-              await createFollowUp({
-                meetingId,
-                task: fu.task,
-                assignee: fu.assignee || "Unassigned",
-                dueDate: fu.dueDate || date,
-                priority: fu.priority || "medium",
-              });
-            }
-          }
-        }
-      } catch {
-        // AI extraction failed silently — user can add follow-ups manually
-      }
-      setAiLoading(false);
-
-      setTitle("");
-      setNotes("");
-      setParticipants("");
-      onCreated?.(meetingId);
+      setStage("Done!");
+      onClose();
+    } catch (err) {
+      setStage("Error processing — follow-ups may need manual input");
+      setTimeout(onClose, 2000);
     } finally {
       setLoading(false);
-      setAiLoading(false);
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setNotes(text);
+    } catch {
+      // Clipboard access denied
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-gray-400 mb-1.5">
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
             Meeting Title
           </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Sprint Planning"
+            placeholder="e.g. Sprint Planning Q2"
             required
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+            className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition"
+            style={{
+              background: "var(--bg-primary)",
+              border: "1px solid var(--border-bright)",
+              color: "var(--text-primary)",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border-bright)")}
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-400 mb-1.5">Date</label>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+            Date
+          </label>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+            className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition"
+            style={{
+              background: "var(--bg-primary)",
+              border: "1px solid var(--border-bright)",
+              color: "var(--text-primary)",
+              colorScheme: "dark",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border-bright)")}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1.5">
-          Participants (comma-separated)
+        <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+          Participants
         </label>
         <input
           type="text"
           value={participants}
           onChange={(e) => setParticipants(e.target.value)}
           placeholder="Alice, Bob, Charlie"
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+          className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition"
+          style={{
+            background: "var(--bg-primary)",
+            border: "1px solid var(--border-bright)",
+            color: "var(--text-primary)",
+          }}
+          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+          onBlur={(e) => (e.target.style.borderColor = "var(--border-bright)")}
         />
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1.5">
-          Meeting Notes
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+            Meeting Notes
+          </label>
+          <button
+            type="button"
+            onClick={handlePaste}
+            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition cursor-pointer"
+            style={{ color: "var(--accent)", background: "var(--accent-glow)" }}
+          >
+            <ClipboardPaste className="w-3 h-3" />
+            Paste
+          </button>
+        </div>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Paste your meeting notes here... The AI will extract action items automatically."
-          rows={6}
+          placeholder="Paste your meeting notes, transcript, or key points here. The agent will automatically extract action items, assign owners, set deadlines, and draft follow-up emails."
+          rows={8}
           required
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-indigo-500/50 transition resize-none"
+          className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition resize-none"
+          style={{
+            background: "var(--bg-primary)",
+            border: "1px solid var(--border-bright)",
+            color: "var(--text-primary)",
+          }}
+          onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+          onBlur={(e) => (e.target.style.borderColor = "var(--border-bright)")}
         />
       </div>
 
       <button
         type="submit"
         disabled={loading || !title || !notes}
-        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-medium py-3 rounded-xl transition cursor-pointer"
+        className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40"
+        style={{
+          background: loading
+            ? "var(--bg-hover)"
+            : "linear-gradient(135deg, #635bff, #7c3aed)",
+          color: "#fff",
+        }}
       >
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            {aiLoading ? "AI extracting follow-ups..." : "Creating..."}
+            <span>{stage}</span>
           </>
         ) : (
           <>
             <Sparkles className="w-4 h-4" />
-            Add Meeting & Extract Follow-ups
+            Add Meeting — Agent Will Process Automatically
           </>
         )}
       </button>

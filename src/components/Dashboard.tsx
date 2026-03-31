@@ -4,266 +4,325 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import MeetingForm from "./MeetingForm";
+import FollowUpCard from "./FollowUpCard";
+import AgentTimeline from "./AgentTimeline";
 import {
+  Plus,
+  X,
   Calendar,
   Users,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  ArrowUpCircle,
+  ChevronRight,
+  Inbox,
+  Zap,
 } from "lucide-react";
 import { Id } from "../../convex/_generated/dataModel";
 
-const priorityColors = {
-  low: "text-blue-400 bg-blue-500/10",
-  medium: "text-yellow-400 bg-yellow-500/10",
-  high: "text-red-400 bg-red-500/10",
-};
-
-const statusIcons = {
-  pending: <Clock className="w-4 h-4 text-yellow-400" />,
-  in_progress: <ArrowUpCircle className="w-4 h-4 text-blue-400" />,
-  completed: <CheckCircle2 className="w-4 h-4 text-green-400" />,
-  overdue: <AlertCircle className="w-4 h-4 text-red-400" />,
-};
-
 export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
-  const [expandedMeeting, setExpandedMeeting] =
-    useState<Id<"meetings"> | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Id<"meetings"> | null>(null);
 
   const meetings = useQuery(api.meetings.list) || [];
   const allFollowUps = useQuery(api.followUps.listAll) || [];
-  const updateStatus = useMutation(api.followUps.updateStatus);
   const removeMeeting = useMutation(api.meetings.remove);
-  const removeFollowUp = useMutation(api.followUps.remove);
 
   const stats = {
+    meetings: meetings.length,
+    pending: allFollowUps.filter((f) => f.status === "pending" || f.status === "in_progress").length,
+    completed: allFollowUps.filter((f) => f.status === "completed" || f.status === "email_sent").length,
     total: allFollowUps.length,
-    pending: allFollowUps.filter(
-      (f) => f.status === "pending" || f.status === "in_progress"
-    ).length,
-    completed: allFollowUps.filter((f) => f.status === "completed").length,
-    overdue: allFollowUps.filter((f) => f.status === "overdue").length,
   };
 
-  const getFollowUpsForMeeting = (meetingId: Id<"meetings">) =>
-    allFollowUps.filter((f) => f.meetingId === meetingId);
+  const activeMeeting = selectedMeeting
+    ? meetings.find((m) => m._id === selectedMeeting)
+    : null;
 
-  const cycleStatus = async (
-    id: Id<"followUps">,
-    current: string
-  ) => {
-    const order = ["pending", "in_progress", "completed"] as const;
-    const idx = order.indexOf(current as any);
-    const next = order[(idx + 1) % order.length];
-    await updateStatus({ id, status: next });
-  };
+  const meetingFollowUps = selectedMeeting
+    ? allFollowUps.filter((f) => f.meetingId === selectedMeeting)
+    : allFollowUps;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 pb-24">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-          MeetBud AI
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Your AI meeting follow-up buddy
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-8">
-        {[
-          {
-            label: "Total",
-            value: stats.total,
-            color: "text-gray-300",
-            bg: "bg-white/5",
-          },
-          {
-            label: "Pending",
-            value: stats.pending,
-            color: "text-yellow-400",
-            bg: "bg-yellow-500/5",
-          },
-          {
-            label: "Done",
-            value: stats.completed,
-            color: "text-green-400",
-            bg: "bg-green-500/5",
-          },
-          {
-            label: "Overdue",
-            value: stats.overdue,
-            color: "text-red-400",
-            bg: "bg-red-500/5",
-          },
-        ].map(({ label, value, color, bg }) => (
+    <div className="h-screen flex overflow-hidden">
+      {/* Sidebar — Meeting List */}
+      <div
+        className="w-72 shrink-0 flex flex-col"
+        style={{
+          background: "var(--bg-secondary)",
+          borderRight: "1px solid var(--border)",
+        }}
+      >
+        {/* Logo */}
+        <div className="px-5 py-5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
           <div
-            key={label}
-            className={`${bg} rounded-xl p-4 border border-white/5`}
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #635bff, #7c3aed)" }}
           >
-            <div className={`text-2xl font-bold ${color}`}>{value}</div>
-            <div className="text-xs text-gray-500 mt-1">{label}</div>
+            <Zap className="w-4 h-4 text-white" />
           </div>
-        ))}
-      </div>
-
-      {/* Add Meeting Button / Form */}
-      <div className="mb-8">
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="w-full py-3 rounded-xl border border-dashed border-indigo-500/30 text-indigo-400 text-sm hover:bg-indigo-500/5 transition flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <FileText className="w-4 h-4" />
-          {showForm ? "Hide Form" : "Add Meeting Notes"}
-        </button>
-        {showForm && (
-          <div className="mt-4 p-5 rounded-xl bg-white/[0.02] border border-white/5">
-            <MeetingForm onCreated={() => setShowForm(false)} />
+          <div>
+            <h1 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              MeetBud AI
+            </h1>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              Autonomous follow-up agent
+            </p>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Meetings List */}
-      <div className="space-y-3">
-        {meetings.length === 0 && (
-          <div className="text-center py-16 text-gray-600">
-            <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No meetings yet. Add your first meeting above.</p>
-          </div>
-        )}
-        {meetings.map((meeting) => {
-          const followUps = getFollowUpsForMeeting(meeting._id);
-          const isExpanded = expandedMeeting === meeting._id;
+        {/* Stats Row */}
+        <div className="px-4 py-3 grid grid-cols-3 gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
+          {[
+            { label: "Meetings", value: stats.meetings, color: "var(--accent)" },
+            { label: "Pending", value: stats.pending, color: "#f5a623" },
+            { label: "Done", value: stats.completed, color: "#3ecf8e" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="text-center">
+              <div className="text-lg font-bold" style={{ color }}>{value}</div>
+              <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{label}</div>
+            </div>
+          ))}
+        </div>
 
-          return (
-            <div
-              key={meeting._id}
-              className="rounded-xl border border-white/5 bg-white/[0.02] overflow-hidden"
+        {/* Add Button */}
+        <div className="px-3 py-3">
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium transition cursor-pointer"
+            style={{
+              background: "var(--accent-glow)",
+              color: "var(--accent)",
+              border: "1px solid rgba(99,91,255,0.2)",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(99,91,255,0.2)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent-glow)")}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Meeting
+          </button>
+        </div>
+
+        {/* View All Button */}
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setSelectedMeeting(null)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition cursor-pointer"
+            style={{
+              background: selectedMeeting === null ? "var(--bg-hover)" : "transparent",
+              color: selectedMeeting === null ? "var(--text-primary)" : "var(--text-secondary)",
+            }}
+            onMouseEnter={(e) => {
+              if (selectedMeeting !== null) e.currentTarget.style.background = "var(--bg-hover)";
+            }}
+            onMouseLeave={(e) => {
+              if (selectedMeeting !== null) e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <Inbox className="w-3.5 h-3.5" />
+            All Follow-ups
+            <span
+              className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
+              style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}
             >
-              {/* Meeting Header */}
+              {stats.total}
+            </span>
+          </button>
+        </div>
+
+        {/* Meeting List */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5">
+          <div className="text-[10px] font-medium tracking-wider uppercase px-3 py-2" style={{ color: "var(--text-muted)" }}>
+            Meetings
+          </div>
+          {meetings.map((meeting) => {
+            const isActive = selectedMeeting === meeting._id;
+            const fuCount = allFollowUps.filter((f) => f.meetingId === meeting._id).length;
+            return (
               <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/[0.02] transition"
-                onClick={() =>
-                  setExpandedMeeting(isExpanded ? null : meeting._id)
-                }
+                key={meeting._id}
+                onClick={() => setSelectedMeeting(meeting._id)}
+                className="group flex items-center gap-3 px-3 py-2.5 rounded-lg transition cursor-pointer"
+                style={{
+                  background: isActive ? "var(--bg-hover)" : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.background = "transparent";
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white text-sm">
-                      {meeting.title}
-                    </h3>
-                    <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-                      <span>{meeting.date}</span>
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {meeting.participants.length}
-                      </span>
-                      <span>{followUps.length} follow-ups</span>
-                    </div>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{
+                    background: meeting.processed
+                      ? "rgba(62,207,142,0.1)"
+                      : "rgba(245,166,35,0.1)",
+                  }}
+                >
+                  <Calendar
+                    className="w-4 h-4"
+                    style={{ color: meeting.processed ? "#3ecf8e" : "#f5a623" }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                    {meeting.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                      {meeting.date}
+                    </span>
+                    <span className="text-[10px] flex items-center gap-0.5" style={{ color: "var(--text-muted)" }}>
+                      <Users className="w-2.5 h-2.5" />
+                      {meeting.participants.length}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeMeeting({ id: meeting._id });
-                    }}
-                    className="p-2 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                  {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-gray-500" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                <div className="flex items-center gap-1.5">
+                  {fuCount > 0 && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{ background: "var(--accent-glow)", color: "var(--accent)" }}
+                    >
+                      {fuCount}
+                    </span>
                   )}
+                  <ChevronRight className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
                 </div>
               </div>
-
-              {/* Expanded Content */}
-              {isExpanded && (
-                <div className="border-t border-white/5 p-4 space-y-3">
-                  {/* Notes Preview */}
-                  <div className="text-xs text-gray-500 bg-white/[0.02] rounded-lg p-3 max-h-32 overflow-y-auto">
-                    {meeting.notes}
-                  </div>
-
-                  {/* Follow-ups */}
-                  {followUps.length === 0 ? (
-                    <p className="text-xs text-gray-600 text-center py-4">
-                      No follow-ups extracted. Ask the AI to parse the notes.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {followUps.map((fu) => (
-                        <div
-                          key={fu._id}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition ${
-                            fu.status === "completed"
-                              ? "border-green-500/10 bg-green-500/[0.02] opacity-60"
-                              : "border-white/5 bg-white/[0.02]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <button
-                              onClick={() =>
-                                cycleStatus(fu._id, fu.status)
-                              }
-                              className="shrink-0 cursor-pointer"
-                            >
-                              {
-                                statusIcons[
-                                  fu.status as keyof typeof statusIcons
-                                ]
-                              }
-                            </button>
-                            <div className="min-w-0">
-                              <p
-                                className={`text-sm ${fu.status === "completed" ? "line-through text-gray-500" : "text-white"}`}
-                              >
-                                {fu.task}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500">
-                                  {fu.assignee}
-                                </span>
-                                <span className="text-xs text-gray-600">
-                                  Due: {fu.dueDate}
-                                </span>
-                                <span
-                                  className={`text-xs px-1.5 py-0.5 rounded ${priorityColors[fu.priority]}`}
-                                >
-                                  {fu.priority}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeFollowUp({ id: fu._id })}
-                            className="p-1.5 rounded hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div
+          className="px-6 py-4 flex items-center justify-between shrink-0"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+              {activeMeeting ? activeMeeting.title : "All Follow-ups"}
+            </h2>
+            {activeMeeting && (
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {activeMeeting.date} · {activeMeeting.participants.join(", ")}
+                {activeMeeting.summary && ` · ${activeMeeting.summary}`}
+              </p>
+            )}
+            {!activeMeeting && (
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {stats.pending} pending · {stats.completed} completed
+              </p>
+            )}
+          </div>
+          {activeMeeting && (
+            <button
+              onClick={() => removeMeeting({ id: activeMeeting._id }).then(() => setSelectedMeeting(null))}
+              className="text-xs px-3 py-1.5 rounded-lg transition cursor-pointer"
+              style={{ color: "var(--text-muted)", border: "1px solid var(--border)" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#ef4444";
+                e.currentTarget.style.color = "#ef4444";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              Delete Meeting
+            </button>
+          )}
+        </div>
+
+        {/* Follow-ups List */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {meetingFollowUps.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: "var(--accent-glow)" }}
+              >
+                <Inbox className="w-8 h-8" style={{ color: "var(--accent)" }} />
+              </div>
+              <h3 className="text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                No follow-ups yet
+              </h3>
+              <p className="text-xs max-w-xs" style={{ color: "var(--text-muted)" }}>
+                Add a meeting and the agent will automatically extract action items, assign owners, and draft follow-up emails.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-w-2xl">
+              {meetingFollowUps.map((fu) => {
+                const meeting = meetings.find((m) => m._id === fu.meetingId);
+                return (
+                  <FollowUpCard
+                    key={fu._id}
+                    followUp={fu}
+                    meetingTitle={meeting?.title || "Unknown"}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right Panel — Agent Activity Timeline */}
+      <div
+        className="w-80 shrink-0 flex flex-col"
+        style={{
+          background: "var(--bg-secondary)",
+          borderLeft: "1px solid var(--border)",
+        }}
+      >
+        <AgentTimeline />
+      </div>
+
+      {/* Modal — New Meeting Form */}
+      {showForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => e.target === e.currentTarget && setShowForm(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl overflow-hidden animate-slide-up"
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-bright)",
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  New Meeting
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  Paste notes and let the agent handle the rest
+                </p>
+              </div>
+              <button
+                onClick={() => setShowForm(false)}
+                className="p-2 rounded-lg transition cursor-pointer"
+                style={{ color: "var(--text-muted)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <MeetingForm onClose={() => setShowForm(false)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

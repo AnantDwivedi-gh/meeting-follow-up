@@ -1,23 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0a0a;
-  --fg: #ededed;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --surface: #1a1a2e;
-  --surface-2: #16213e;
-  --border: #2a2a4a;
-  --muted: #888;
-}
-
-body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, sans-serif;
+  --bg-primary: #08080c;
+  --bg-secondary: #0f1117;
+  --bg-elevated: #161923;
+  --bg-hover: #1c2030;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-bright: rgba(255, 255, 255, 0.1);
+  --text-primary: #f0f0f5;
+  --text-secondary: #8b8fa3;
+  --text-muted: #4e5264;
+  --accent: #635bff;
+  --accent-glow: rgba(99, 91, 255, 0.15);
+  --green: #3ecf8e;
+  --yellow: #f5a623;
+  --red: #ef4444;
+  --blue: #3b82f6;
 }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99, 91, 255, 0.3), rgba(99, 91, 255, 0));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }

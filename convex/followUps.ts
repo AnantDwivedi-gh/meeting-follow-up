@@ -31,18 +31,14 @@ export const create = mutation({
     meetingId: v.id("meetings"),
     task: v.string(),
     assignee: v.string(),
+    assigneeEmail: v.optional(v.string()),
     dueDate: v.string(),
-    priority: v.union(
-      v.literal("low"),
-      v.literal("medium"),
-      v.literal("high")
-    ),
+    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("followUps", {
       ...args,
       status: "pending",
-      reminderSent: false,
       createdAt: Date.now(),
     });
   },
@@ -55,11 +51,32 @@ export const updateStatus = mutation({
       v.literal("pending"),
       v.literal("in_progress"),
       v.literal("completed"),
-      v.literal("overdue")
+      v.literal("overdue"),
+      v.literal("email_sent")
     ),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, { status: args.status });
+  },
+});
+
+export const setEmailDraft = mutation({
+  args: {
+    id: v.id("followUps"),
+    emailDraft: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { emailDraft: args.emailDraft });
+  },
+});
+
+export const markEmailSent = mutation({
+  args: { id: v.id("followUps") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      status: "email_sent",
+      emailSentAt: Date.now(),
+    });
   },
 });
 
