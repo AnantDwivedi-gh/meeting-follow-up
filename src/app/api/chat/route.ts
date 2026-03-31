@@ -3,7 +3,7 @@ import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const SYSTEM_PROMPT = `You are FollowUp Agent — an AI assistant specialized in managing meeting follow-ups. You help users:
+const SYSTEM_PROMPT = `You are MeetBud AI — an AI assistant specialized in managing meeting follow-ups. You help users:
 
 1. Parse meeting notes and extract action items, owners, and deadlines
 2. Track follow-up status and send reminders

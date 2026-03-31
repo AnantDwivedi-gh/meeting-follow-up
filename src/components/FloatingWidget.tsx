@@ -156,7 +156,7 @@ export default function FloatingWidget() {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-400" />
                 <span className="font-semibold text-sm text-white">
-                  FollowUp Agent
+                  MeetBud AI
                 </span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">
                   Online

@@ -69,10 +69,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-          FollowUp Agent
+          MeetBud AI
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          AI-powered meeting follow-up tracker
+          Your AI meeting follow-up buddy
         </p>
       </div>
 

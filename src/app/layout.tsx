@@ -3,8 +3,8 @@ import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 
 export const metadata: Metadata = {
-  title: "FollowUp Agent",
-  description: "AI-powered meeting follow-up agent",
+  title: "MeetBud AI",
+  description: "Your AI-powered meeting follow-up buddy",
 };
 
 export default function RootLayout({
